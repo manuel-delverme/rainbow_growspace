@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/../constrained_nn/.idea/constrained_nn.iml" filepath="$PROJECT_DIR$/../constrained_nn/.idea/constrained_nn.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/rainbow_growspace.iml" filepath="$PROJECT_DIR$/.idea/rainbow_growspace.iml" />
+    </modules>
+  </component>
+</project>
