@@ -1,90 +1,95 @@
 import random
-from datetime import datetime
-from test import test
 
 import growspace  # noqa
 import gym
+import numpy as np
 import torch
 
+import agent
 import config
-from agent import Agent
-from env import WrapPyTorch
-from memory import ReplayMemory
-
-random.seed(config.seed)
-torch.manual_seed(random.randint(1, 10000))
+import env_wrapper
+import memory
+import testing
 
 
-def log(s):
-    print('[' + str(datetime.now().strftime('%Y-%m-%dT%H:%M:%S')) + '] ' + s)
+def main():
+    random.seed(config.seed)
+    torch.manual_seed(config.seed)
 
+    # Environment
+    env = gym.make(config.env_name)
+    env.seed(config.seed)
+    env = env_wrapper.WrapPyTorch(env, stack_size=config.stack_size)
 
-# Environment
-env = gym.make(config.env_name)
-env.seed(config.seed)
-env = WrapPyTorch(env, stack_size=4)
-action_space = env.action_space.n
+    # Agent
+    dqn_agent = agent.Agent(config, env)
+    replay_memory = memory.ReplayMemory(config, config.memory_capacity)
+    priority_weight_increase = (1 - config.priority_weight) / (config.T_max - config.learn_start)
 
-# Agent
-dqn = Agent(config, env)
-mem = ReplayMemory(config, config.memory_capacity)
-priority_weight_increase = (1 - config.priority_weight) / (config.T_max - config.learn_start)
+    validation_replay_memory = memory.ReplayMemory(config, config.evaluation_size)
+    state, done = env.reset(), False
+    state = torch.FloatTensor(state).to(config.device)
 
-# Construct validation memory
-val_mem = ReplayMemory(config, config.evaluation_size)
-T, done = 0, True
-while T < config.evaluation_size:
-    if done:
-        state, done = env.reset(), False
-        state = torch.FloatTensor(state).to(config.device)
-    next_state, _, done, _ = env.step(random.randint(0, action_space - 1))
-    next_state = torch.FloatTensor(next_state).to(config.device)
-    val_mem.append(state, None, None, done)
-    state = next_state
-    T += 1
+    for env_steps in range(config.evaluation_size):
+        next_state, _, done, _ = env.step(env.action_space.sample())
+        next_state = torch.FloatTensor(next_state).to(config.device)
+        validation_replay_memory.append(state, None, None, done)
+        state = next_state
 
-if config.evaluate:
-    dqn.eval()  # Set DQN (online network) to evaluation mode
-    avg_reward, avg_Q = test(config, 0, dqn, val_mem, evaluate=True)  # Test
-    print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
-else:
-    # Training loop
-    dqn.train()
-    T, done = 0, True
-    while T < config.T_max:
         if done:
             state, done = env.reset(), False
             state = torch.FloatTensor(state).to(config.device)
-        if T % config.replay_frequency == 0:
-            dqn.reset_noise()  # Draw a new set of noisy weights
-        action = dqn.act(state)  # Choose an action greedily (with noisy weights)
-        next_state, reward, done, _ = env.step(action)  # Step
-        next_state = torch.FloatTensor(next_state).to(config.device)
-        if config.reward_clip > 0:
-            reward = max(min(reward, config.reward_clip), -config.reward_clip)  # Clip rewards
-        mem.append(state, action, reward, done)  # Append transition to memory
-        T += 1
 
-        if T % config.log_interval == 0:
-            log('T = ' + str(T) + ' / ' + str(config.T_max))
+    if config.evaluate:
+        dqn_agent.eval()  # Set DQN (online network) to evaluation mode
+        avg_reward, avg_Q = testing.test(config, 0, dqn_agent, validation_replay_memory, evaluate=True)  # Test
+        config.tensorboard.add_scalar("test/avg_reward", avg_reward)
+        config.tensorboard.add_scalar("test/avg_reward", avg_Q)
+    else:
+        # Training loop
+        dqn_agent.train()
+        env_steps, done = 0, True
 
-        # Train and test
-        if T >= config.learn_start:
-            mem.priority_weight = min(mem.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
+        for env_steps in range(config.T_max):
+            if done:
+                state, done = env.reset(), False
+                state = torch.FloatTensor(state).to(config.device)
 
-            if T % config.replay_frequency == 0:
-                dqn.learn(mem)  # Train with n-step distributional double-Q learning
+            if env_steps % config.replay_frequency == 0:
+                dqn_agent.reset_noise()  # Draw a new set of noisy weights
+            action = dqn_agent.act(state)  # Choose an action greedily (with noisy weights)
+            next_state, reward, done, _ = env.step(action)  # Step
+            next_state = torch.FloatTensor(next_state).to(config.device)
 
-            if T % config.evaluation_interval == 0:
-                dqn.eval()  # Set DQN (online network) to evaluation mode
-                avg_reward, avg_Q = test(config, T, dqn, val_mem)  # Test
-                log('T = ' + str(T) + ' / ' + str(config.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
-                dqn.train()  # Set DQN (online network) back to training mode
+            if config.reward_clip > 0:
+                reward = np.clip(reward, -config.reward_clip, config.reward_clip)
 
-            # Update target network
-            if T % config.target_update == 0:
-                dqn.update_target_net()
+            replay_memory.append(state, action, reward, done)
 
-        state = next_state
+            if env_steps >= config.learn_start:
+                replay_memory.priority_weight = min(replay_memory.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
 
-env.close()
+                if env_steps % config.replay_frequency == 0:
+                    dqn_agent.learn(replay_memory)  # Train with n-step distributional double-Q learning
+
+                if env_steps % config.evaluation_interval == 0:
+                    assert env_steps // int(1e5) == 0
+
+                    dqn_agent.eval()  # Set DQN (online network) to evaluation mode
+                    avg_reward, avg_Q = testing.test(config, env_steps, dqn_agent, validation_replay_memory)  # Test
+                    config.tensorboard.add_scalar("train/avg_reward", avg_reward, env_steps)
+                    config.tensorboard.add_scalar("train/avg_reward", avg_Q)
+
+                    if env_steps % int(1e6) == 0:
+                        config.tensorboard.add_scalar("test/1e6_mean_reward", avg_reward)
+                    dqn_agent.train()  # Set DQN (online network) back to training mode
+
+                # Update target network
+                if env_steps % config.target_update == 0:
+                    dqn_agent.update_target_net()
+            state = next_state
+    env.close()
+
+
+if __name__ == "__main__":
+    main()

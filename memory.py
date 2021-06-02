@@ -52,7 +52,7 @@ class SegmentTree():
     def find(self, value):
         index = self._retrieve(0, value)  # Search for index of item from root
         data_index = index - self.size + 1
-        return (self.sum_tree[index], data_index, index)  # Return value, data index, tree index
+        return self.sum_tree[index], data_index, index  # Return value, data index, tree index
 
     # Returns data given a data index
     def get(self, data_index):
