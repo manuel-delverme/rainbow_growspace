@@ -65,7 +65,7 @@ batch_size = 32  # , metavar='SIZE', help='Batch size')
 # learn_start = int(80e3)  # , metavar='STEPS', help='Number of steps before starting training')
 learn_start = 1_000
 # evaluate # ='Evaluate only')
-evaluation_interval = 100_000  # , metavar='STEPS', help='Number of training steps between evaluations')
+evaluation_interval = 1_000  # , metavar='STEPS', help='Number of training steps between evaluations')
 evaluation_episodes = 10  # , metavar='N', help='Number of evaluation episodes to average over')
 evaluation_size = 500  # , metavar='N', help='Number of transitions to use for validating Q')
 log_interval = 25000  # , metavar='STEPS', help='Number of training steps between logging status')
