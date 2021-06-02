@@ -15,7 +15,6 @@ gae_lambda = 0.95
 entropy_coef = 0.01
 value_loss_coef = 0.5
 max_grad_norm = 0.5
-seed = 1  # didnt change
 cuda_deterministic = False
 num_processes = 1
 num_steps = 2500
@@ -40,7 +39,7 @@ momentum = 0.95
 
 
 stack_size = 4
-seed = 123  # , help='Random seed')
+seed = 921  # , help='Random seed')
 T_max = int(50e6)
 max_episode_length = int(108e3)
 
@@ -65,7 +64,7 @@ batch_size = 32  # , metavar='SIZE', help='Batch size')
 # learn_start = int(80e3)  # , metavar='STEPS', help='Number of steps before starting training')
 learn_start = 1_000
 # evaluate # ='Evaluate only')
-evaluation_interval = 100_000  # , metavar='STEPS', help='Number of training steps between evaluations')
+evaluation_interval = 1_000  # , metavar='STEPS', help='Number of training steps between evaluations')
 evaluation_episodes = 10  # , metavar='N', help='Number of evaluation episodes to average over')
 evaluation_size = 500  # , metavar='N', help='Number of transitions to use for validating Q')
 log_interval = 25000  # , metavar='STEPS', help='Number of training steps between logging status')
