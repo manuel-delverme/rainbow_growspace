@@ -39,7 +39,7 @@ momentum = 0.95
 
 
 stack_size = 4
-seed = 921  # , help='Random seed')
+seed = 1  # , help='Random seed')
 T_max = int(50e6)
 max_episode_length = int(108e3)
 
