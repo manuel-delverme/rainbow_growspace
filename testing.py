@@ -48,5 +48,5 @@ def test(config, time_step, agent, val_mem, evaluate=False):
     for state in val_mem:  # Iterate over valid states
         Qs.append(agent.evaluate_q(state))
 
-    avg_reward, avg_Q = np.mean(rewards), np.mean(Qs)
+    avg_reward, avg_Q = np.sum(rewards), np.sum(Qs)
     return avg_reward, avg_Q
